@@ -1,32 +1,47 @@
 // src/routes/products.router.js
 import { Router } from 'express';
-import productModel from '../models/product.model.js'; // Asegúrate de que la ruta sea correcta
+import productModel from '../models/product.model.js';
 
 const router = Router();
 
 // GET /api/products
 router.get('/products', async (req, res) => {
-    let { limit = 10, page = 1, sort, query } = req.query;
+    let { limit = 10, page = 1, sort, categoria, minPrice, maxPrice, search } = req.query;
     limit = parseInt(limit);
     page = parseInt(page);
 
     try {
         // Construir filtro de búsqueda
         let filter = {};
-        if (query) {
-            // Buscar por categoría o disponibilidad
-            filter = {
-                $or: [
-                    { category: query },
-                    { available: query.toLowerCase() === 'true' }
-                ]
-            };
+        if (categoria) {
+            filter.category = categoria; // Coincidir exactamente con la categoría
+        }
+        if (minPrice || maxPrice) {
+            filter.price = {};
+            if (minPrice) filter.price.$gte = parseFloat(minPrice); // Precio mínimo
+            if (maxPrice) filter.price.$lte = parseFloat(maxPrice); // Precio máximo
+        }
+        if (search) {
+            filter.$or = [
+                { name: { $regex: search, $options: 'i' } }, // Búsqueda por nombre
+                { description: { $regex: search, $options: 'i' } } // Búsqueda por descripción
+            ];
         }
 
         // Opciones de ordenamiento
         let sortOptions = {};
         if (sort) {
-            sortOptions.price = sort === 'asc' ? 1 : -1; // Ascendente o descendente
+            if (sort === 'name_asc') {
+                sortOptions.name = 1; // Ordenar por nombre ascendente
+            } else if (sort === 'name_desc') {
+                sortOptions.name = -1; // Ordenar por nombre descendente
+            } else if (sort === 'date_asc') {
+                sortOptions.createdAt = 1; // Ordenar por fecha de creación ascendente
+            } else if (sort === 'date_desc') {
+                sortOptions.createdAt = -1; // Ordenar por fecha de creación descendente
+            } else {
+                sortOptions.price = sort === 'asc' ? 1 : -1; // Ordenar por precio
+            }
         }
 
         // Obtener el total de productos que coinciden con el filtro
@@ -52,8 +67,8 @@ router.get('/products', async (req, res) => {
             page,
             hasPrevPage: page > 1,
             hasNextPage: page < totalPages,
-            prevLink: page > 1 ? `/api/products?limit=${limit}&page=${page - 1}&sort=${sort || ''}&query=${query || ''}` : null,
-            nextLink: page < totalPages ? `/api/products?limit=${limit}&page=${page + 1}&sort=${sort || ''}&query=${query || ''}` : null
+            prevLink: page > 1 ? `/api/products?limit=${limit}&page=${page - 1}&sort=${sort || ''}&categoria=${categoria || ''}&minPrice=${minPrice || ''}&maxPrice=${maxPrice || ''}&search=${search || ''}` : null,
+            nextLink: page < totalPages ? `/api/products?limit=${limit}&page=${page + 1}&sort=${sort || ''}&categoria=${categoria || ''}&minPrice=${minPrice || ''}&maxPrice=${maxPrice || ''}&search=${search || ''}` : null
         };
 
         res.json(response);
